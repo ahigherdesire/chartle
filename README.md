@@ -119,46 +119,64 @@ sequence — if those two ever drift, every rank the game shows becomes a lie.
 
 ## Deploying to Cloudflare Pages
 
-Static site, no build step, no server. Two commands.
+Static site, no build step, no server. Cloudflare builds straight from this
+repo — `index.html`, `_headers` and `data/` all sit at the root, and the puzzle
+set is committed, so there is nothing to compile.
 
-### One-time setup
+### Connect the repo (one time)
 
-You need a free Cloudflare account and Node (already installed if `npx` works).
+1. [Cloudflare dashboard](https://dash.cloudflare.com) → **Workers & Pages** →
+   **Create** → **Pages** → **Connect to Git**
+2. Authorise GitHub, then pick **`ahigherdesire/chartle`**
+3. Configure the build:
 
-### Deploy
+| Setting | Value |
+|---|---|
+| Production branch | `main` |
+| Framework preset | **None** |
+| Build command | *leave empty* |
+| Build output directory | `/` |
+| Root directory | *leave empty* |
 
-```bash
-python build_data.py
-```
+4. **Save and Deploy**
 
-```bash
-python make_dist.py
-```
+First build takes under a minute — it's a file copy, not a compile. You get
+`https://chartle.pages.dev`.
 
-```bash
-npx wrangler pages deploy dist --project-name=chartle
-```
-
-The first `wrangler` run opens a browser to authorise your Cloudflare account.
-If the project doesn't exist yet it offers to create it — accept, and pick
-`main` as the production branch.
-
-You get `https://chartle.pages.dev`. Every later deploy also gets its own
-immutable preview URL, so you can hand someone a specific build.
-
-### Why `dist/` and not the repo root
-
-`wrangler pages deploy` uploads *everything* in the directory you point it at.
-Aim it at the repo root and you publish `build_data.py`, the README, and any
-stray files. `make_dist.py` copies only `index.html`, `data/` and `_headers`.
+An empty build command is the important part. Pages defaults to trying to detect
+a framework; there isn't one here, and any build step it invents will fail.
 
 ### Updating
 
-Re-run the last two commands. To refresh the puzzle set, re-run all three.
+Push to `main` and Cloudflare rebuilds automatically.
+
+```bash
+git add -A && git commit -m "tweak" && git push
+```
+
+Pull requests get their own preview URL, so you can play a change before it goes
+to the live puzzle.
+
+To refresh the puzzle set, rebuild the data locally first — the fetch makes ~60
+outbound calls to Yahoo and has no business running in CI:
+
+```bash
+python build_data.py && git add data/charts.json && git commit -m "refresh puzzle set" && git push
+```
+
+### What gets served
+
+With output directory `/`, Pages serves the whole repo — so `build_data.py` and
+this README are publicly fetchable. Harmless for an open-source project. If you
+want only the game served, deploy `dist/` by hand instead:
 
 ```bash
 python make_dist.py && npx wrangler pages deploy dist --project-name=chartle
 ```
+
+`make_dist.py` copies only `index.html`, `data/` and `_headers`. Note that
+mixing direct upload into a Git-connected project creates deployments Cloudflare
+won't associate with a commit — pick one and stick to it.
 
 ### Caching
 
@@ -180,14 +198,6 @@ index.html     43 KB raw ->  13 KB gzip
 
 Cloudflare dashboard → Workers & Pages → chartle → Custom domains → *Set up a
 domain*. If the domain is already on Cloudflare, DNS is wired automatically.
-
-### Git integration instead?
-
-Possible, but awkward here: this lives inside a large mixed repo, so you'd have
-to set *Root directory* to `chartle` and give Pages a build command that runs
-Python to produce `dist/`. Direct upload avoids all of that, and the dataset
-build wants to run on your machine anyway — it makes ~60 outbound calls to
-Yahoo.
 
 ### A note before you point traffic at it
 
