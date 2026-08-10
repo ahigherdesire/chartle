@@ -1,0 +1,22 @@
+# Cloudflare Pages headers. Must sit in the root of the deployed directory.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+
+# The page itself must revalidate, or a redeploy won't reach anyone who has
+# already played today.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# The puzzle set only changes when build_data.py is re-run, and the daily
+# rotation happens client-side from the date - so this can cache hard. The
+# stale-while-revalidate window means a rebuild propagates without ever making
+# a player wait on a 1MB download.
+/data/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=604800
